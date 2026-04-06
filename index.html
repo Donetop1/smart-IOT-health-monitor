@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Health Watch Dashboard</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root { 
+            --bg: #0f0f1a; 
+            --card: #1a1a2e; 
+            --accent: #6a11cb; 
+            --accent2: #2575fc; 
+            --text: #e0e0ff; 
+            --text-light: #a0a0cc; 
+        }
+        
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 0; 
+            overflow-x: hidden;
+        }
+
+        /* ==================== FIXED TOP HEADER ==================== */
+        .top-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 52px;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(106, 17, 203, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 5px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+
+        .logout-btn:hover {
+            background: #ff6b6b;
+            transform: scale(1.08);
+        }
+
+        .time-date {
+            font-size: 13.5px;
+            color: var(--text-light);
+            font-weight: 500;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        /* WiFi Indicator */
+        .wifi-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .wifi-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+        }
+
+        .bar {
+            width: 3px;
+            background: #444; /* Default dark */
+            transition: all 0.3s ease;
+        }
+        .bar1 { height: 5px; }
+        .bar2 { height: 8px; }
+        .bar3 { height: 11px; }
+        .bar4 { height: 14px; }
+
+        /* Battery */
+        .battery-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .battery {
+            width: 28px;
+            height: 14px;
+            border: 2px solid #a0a0cc;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .battery-level {
+            height: 100%;
+            background: #22c55e;
+            transition: width 0.4s ease;
+        }
+
+        .battery::after {
+            content: '';
+            position: absolute;
+            right: -2px;
+            top: 3px;
+            width: 3px;
+            height: 8px;
+            background: #a0a0cc;
+            border-radius: 1px;
+        }
+
+        /* Login Screen */
+        #loginScreen { 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.95); 
+            display: flex; 
+            align-items:center; 
+            justify-content:center; 
+            z-index:1000; 
+        }
+        
+        .auth-card { 
+            background: var(--card); 
+            padding:40px 30px; 
+            border-radius:20px; 
+            width:90%; 
+            max-width:400px; 
+            text-align:center; 
+            box-shadow:0 20px 40px rgba(106,17,203,0.3); 
+        }
+        
+        h2 { color:var(--accent); margin-bottom:25px; font-size: 1.8rem; }
+        
+        input { 
+            width: 100%;
+            box-sizing: border-box; 
+            padding:15px; 
+            margin:12px 0; 
+            background:#16213e; 
+            border:2px solid #334155; 
+            border-radius:12px; 
+            color:white; 
+            font-size:16px; 
+        }
+        
+        button { 
+            width:100%; 
+            padding:15px; 
+            background:linear-gradient(to right, var(--accent), var(--accent2)); 
+            color:white; 
+            border:none; 
+            border-radius:12px; 
+            font-size:17px; 
+            font-weight:bold; 
+            cursor:pointer; 
+            margin-top:10px; 
+            height: 52px;
+        }
+        
+        .error { color:#ff6b6b; margin-top:10px; }
+        
+        .password-wrapper { 
+            position: relative; 
+            width: 100%; 
+        }
+        
+        .password-wrapper input { padding-right: 50px; margin: 12px 0; }
+
+        .toggle-password { 
+            position: absolute; 
+            right: 18px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            cursor: pointer; 
+            color: #a0a0cc; 
+            font-size: 20px; 
+        }
+
+        #dashboard { display:none; padding-top: 70px; } 
+
+        .header { 
+            text-align:center; 
+            margin-bottom:25px; 
+        }
+        
+        .header h1 { 
+            font-size:2.3rem; 
+            background:linear-gradient(to right,var(--accent),var(--accent2)); 
+            -webkit-background-clip:text; 
+            -webkit-text-fill-color:transparent; 
+            margin: 0 0 8px 0;
+        }
+        
+        .header p {
+            margin: 0;
+            color: var(--text-light);
+            font-size: 1.05rem;
+        }
+
+        #safetyBox {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 0 auto 25px;
+            max-width: 1400px;
+            border: 2px solid #6a11cb;
+            box-shadow: 0 8px 25px rgba(106,17,203,0.3);
+        }
+        
+        #safetyTitle { 
+            font-size: 1.35rem; 
+            margin-bottom: 12px; 
+            color: #ff9500; 
+            font-weight: bold; 
+        }
+        
+        #safetyMsg {
+            font-size: 1.02rem;
+            line-height: 1.65;
+            background: #16213e;
+            padding: 15px;
+            border-radius: 12px;
+            border-left: 5px solid #ff9500;
+        }
+
+        .container { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 16px; 
+            max-width: 1400px; 
+            margin: 0 auto; 
+        }
+
+        @media (max-width: 1024px) {
+            .container { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        @media (max-width: 600px) {
+            .container { grid-template-columns: 1fr; }
+            .digital-value { font-size: 2.5rem; }
+        }
+
+        .card { 
+            background: var(--card); 
+            border-radius: 20px; 
+            padding: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); 
+        }
+        
+        .param-name { 
+            font-size: 1.05rem; 
+            color: var(--text-light); 
+            margin-bottom: 6px; 
+        }
+        
+        .digital-value { 
+            font-size: 2.85rem; 
+            font-weight: 700; 
+            letter-spacing: -1.5px; 
+            margin: 8px 0; 
+            color: white; 
+        }
+        
+        .unit { 
+            font-size: 1.05rem; 
+            color: var(--text-light); 
+        }
+        
+        .status { 
+            padding: 7px 16px; 
+            border-radius: 30px; 
+            font-weight: bold; 
+            display: inline-block; 
+            margin-top: 10px; 
+            font-size: 0.93rem;
+        }
+        
+        .safe { background:#22c55e; color:#0f172a; }
+        .warn { background:#eab308; color:#0f172a; }
+        .danger { background:#ef4444; color:white; }
+
+        canvas { 
+            margin-top: 18px; 
+            height: 180px !important; 
+            width: 100% !important; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-header">
+        <div class="header-left">
+            <button class="logout-btn" onclick="logout()">LOGOUT</button>
+        </div>
+
+        <div class="time-date" id="timeDate">Loading time...</div>
+
+        <div class="header-right">
+            <div class="wifi-container" id="wifiContainer">
+                <span id="wifiText">WiFi</span>
+                <div class="wifi-bars" id="wifiBars">
+                    <div class="bar bar1" id="wb1"></div>
+                    <div class="bar bar2" id="wb2"></div>
+                    <div class="bar bar3" id="wb3"></div>
+                    <div class="bar bar4" id="wb4"></div>
+                </div>
+            </div>
+
+            <div class="battery-container" id="batteryContainer">
+                <span id="batteryPercent">--%</span>
+                <div class="battery">
+                    <div class="battery-level" id="batteryLevel" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loginScreen">
+        <div class="auth-card">
+            <h2>Smart Health Watch</h2>
+            <input type="email" id="loginEmail" placeholder="Email Address">
+            <div class="password-wrapper">
+                <input type="password" id="loginPassword" placeholder="Password">
+                <span class="toggle-password" onclick="togglePassword('loginPassword', this)">👁️</span>
+            </div>
+            <button onclick="login()">Sign In</button>
+            <div class="error" id="loginError"></div>
+        </div>
+    </div>
+
+    <div id="dashboard">
+        <div class="header">
+            <h1>Smart Health Watch</h1>
+            <p>Real-time Vital Signs Monitoring</p>
+        </div>
+
+        <div id="safetyBox">
+            <div id="safetyTitle">🛡️ Health Safety Recommendations</div>
+            <div id="safetyMsg">Waiting for sensor data from smartwatch...</div>
+        </div>
+
+        <div id="statusMsg" style="text-align:center; color:#22c55e; margin:12px 0; font-weight:bold; font-size: 1.05rem;">
+            Waiting for data from smartwatch...
+        </div>
+
+        <div class="container">
+            <div class="card">
+                <div class="param-name">❤️ Heart Rate</div>
+                <div class="digital-value" id="hrVal">0</div>
+                <span class="unit">BPM</span>
+                <span id="hrStatus" class="status">--</span>
+                <canvas id="hrChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="param-name">🌡️ Body Temperature</div>
+                <div class="digital-value" id="tempVal">0</div>
+                <span class="unit">°C</span>
+                <span id="tempStatus" class="status">--</span>
+                <canvas id="tempChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="param-name">🩸 Blood Oxygen (SpO₂)</div>
+                <div class="digital-value" id="spo2Val">0</div>
+                <span class="unit">%</span>
+                <span id="spo2Status" class="status">--</span>
+                <canvas id="spo2Chart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="param-name">🩸 Blood Pressure</div>
+                <div class="digital-value" id="bpVal">0</div>
+                <span class="unit">mmHg</span>
+                <span id="bpStatus" class="status">--</span>
+                <canvas id="bpChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAkGxn7ssRLSNlS8k57QQO1b-0VMLA932Y",
+            authDomain: "smartwatch-project-83db1.firebaseapp.com",
+            databaseURL: "https://smartwatch-project-83db1-default-rtdb.firebaseio.com",
+            projectId: "smartwatch-project-83db1",
+            appId: "1:251212105054:web:c131bc782c57907171bbcf"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        let charts = {};
+        const dataArrays = { hr: [], temp: [], spo2: [], bp: [] };
+        let labels = [];
+        let listenerAttached = false;
+        let watchdogTimer; // Timer for offline detection
+
+        function updateTime() {
+            const now = new Date();
+            const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            document.getElementById('timeDate').textContent = now.toLocaleString('en-US', options);
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // FUNCTION TO HANDLE DISCONNECTION / POWER OFF
+        function setDeviceOffline() {
+            const statusEl = document.getElementById('statusMsg');
+            statusEl.innerHTML = "❌ Device Offline / Network Service Problem";
+            statusEl.style.color = "#ef4444";
+            
+            // Reset sensor values to 0 as requested
+            document.getElementById('hrVal').innerText = "0";
+            document.getElementById('tempVal').innerText = "0";
+            document.getElementById('spo2Val').innerText = "0";
+            document.getElementById('bpVal').innerText = "0";
+            
+            document.getElementById('safetyMsg').innerHTML = "Device disconnected. Check power and network connection.";
+        }
+
+        function updateSystemStatus(data) {
+            const wifiStrength = data.wifiStrength || 0;
+            const bars = [document.getElementById('wb1'), document.getElementById('wb2'), document.getElementById('wb3'), document.getElementById('wb4')];
+            
+            bars.forEach((bar, index) => {
+                if (index < wifiStrength) {
+                    bar.style.background = wifiStrength < 2 ? "#ef4444" : (wifiStrength < 3 ? "#eab308" : "#22c55e");
+                } else {
+                    bar.style.background = "#444";
+                }
+            });
+
+            const batteryLevel = Math.min(100, Math.max(0, data.battery || 0));
+            document.getElementById('batteryPercent').textContent = batteryLevel + '%';
+            const batLevelEl = document.getElementById('batteryLevel');
+            batLevelEl.style.width = batteryLevel + '%';
+            batLevelEl.style.background = batteryLevel < 20 ? '#ef4444' : '#22c55e';
+        }
+
+        function safeNumber(val) { 
+            const num = Number(val); 
+            return isNaN(num) ? 0 : num; 
+        }
+
+        function createChart(canvasId, label, color) {
+            return new Chart(document.getElementById(canvasId), {
+                type: 'line',
+                data: { 
+                    labels: labels, 
+                    datasets: [{ 
+                        label: label, 
+                        data: dataArrays[canvasId.replace('Chart','')], 
+                        borderColor: color, 
+                        backgroundColor: color + '33', 
+                        tension: 0.4, 
+                        borderWidth: 3 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: '#334155' } }, 
+                        x: { grid: { color: '#334155' } } 
+                    }, 
+                    plugins: { legend: { labels: { color: '#a0a0cc' } } }
+                }
+            });
+        }
+
+        function initCharts() {
+            charts.hr = createChart('hrChart', 'Heart Rate', '#ff4757');
+            charts.temp = createChart('tempChart', 'Temperature', '#ff9500');
+            charts.spo2 = createChart('spo2Chart', 'SpO₂', '#22c55e');
+            charts.bp = createChart('bpChart', 'MAP', '#ef4444');
+        }
+
+        function togglePassword(fieldId, icon) {
+            const field = document.getElementById(fieldId);
+            if (field.type === "password") {
+                field.type = "text"; icon.textContent = "🙈";
+            } else {
+                field.type = "password"; icon.textContent = "👁️";
+            }
+        }
+
+        function login() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const pass = document.getElementById('loginPassword').value;
+            auth.signInWithEmailAndPassword(email, pass)
+                .catch(err => document.getElementById('loginError').textContent = err.message);
+        }
+
+        function logout() {
+            auth.signOut().then(() => {
+                listenerAttached = false;
+                document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('loginScreen').style.display = 'flex';
+            });
+        }
+
+        function getStatusAndMsg(param, value) {
+            if (value === 0 || value === null) 
+                return { status: "WAIT", msg: "Sampling...", color: "warn", advice: "Waiting for fresh data from smartwatch..." };
+
+            if (param === "hr") {
+                if (value < 60) return { status: "DANGER", msg: "Low (Bradycardia)", color: "danger", advice: "🚨 Low heart rate detected. Rest and seek medical attention if dizzy." };
+                if (value > 100) return { status: "DANGER", msg: "High (Tachycardia)", color: "danger", advice: "🚨 High heart rate. Sit down and breathe calmly." };
+                return { status: "SAFE", msg: "Normal", color: "safe", advice: "Heart rate is within healthy range." };
+            }
+            if (param === "temp") {
+                if (value < 36.5) return { status: "DANGER", msg: "Low Temperature", color: "danger", advice: "Body temperature is low. Keep warm." };
+                if (value > 37.5) return { status: "DANGER", msg: "Fever Detected", color: "danger", advice: "Fever detected. Rest and hydrate." };
+                return { status: "SAFE", msg: "Normal", color: "safe", advice: "Body temperature is normal." };
+            }
+            if (param === "spo2") {
+                if (value < 95) return { status: "DANGER", msg: "Low Oxygen", color: "danger", advice: "🚨 Low oxygen saturation! Seek medical help immediately." };
+                if (value < 97) return { status: "WARN", msg: "Borderline", color: "warn", advice: "Oxygen level is slightly low. Rest." };
+                return { status: "SAFE", msg: "Normal", color: "safe", advice: "Oxygen saturation is excellent." };
+            }
+            if (param === "bp") {
+                if (value < 90) return { status: "DANGER", msg: "Low BP", color: "danger", advice: "Low blood pressure. Sit or lie down." };
+                if (value > 120) return { status: "DANGER", msg: "High BP", color: "danger", advice: "High blood pressure detected. Rest." };
+                return { status: "SAFE", msg: "Normal", color: "safe", advice: "Blood pressure is normal." };
+            }
+            return { status: "SAFE", msg: "Normal", color: "safe", advice: "Parameter is normal." };
+        }
+
+        function updateSafetyRecommendation(data) {
+            let html = `<strong>Current Vital Signs & Health Advice:</strong><br><br>`;
+            
+            const hrInfo = getStatusAndMsg("hr", safeNumber(data.heartRate));
+            const tempInfo = getStatusAndMsg("temp", safeNumber(data.temperature));
+            const spo2Info = getStatusAndMsg("spo2", safeNumber(data.spo2));
+            const bpInfo = getStatusAndMsg("bp", safeNumber(data.map));
+
+            const params = [
+                { name: "Heart Rate", val: data.heartRate, unit: "BPM", st: hrInfo.msg, advice: hrInfo.advice },
+                { name: "Temperature", val: data.temperature, unit: "°C", st: tempInfo.msg, advice: tempInfo.advice },
+                { name: "SpO₂", val: data.spo2, unit: "%", st: spo2Info.msg, advice: spo2Info.advice },
+                { name: "Blood Pressure (MAP)", val: data.map, unit: "mmHg", st: bpInfo.msg, advice: bpInfo.advice }
+            ];
+
+            params.forEach(p => {
+                let color = (p.st.includes("Low") || p.st.includes("High") || p.st.includes("Fever")) ? "#ef4444" : 
+                            (p.st.includes("Borderline") || p.st.includes("Sampling")) ? "#eab308" : "#22c55e";
+                
+                html += `<div class="param-status" style="color:${color}">
+                    <strong>${p.name}:</strong> ${p.st} (${safeNumber(p.val).toFixed(1)} ${p.unit})<br>
+                    <span style="font-size:0.95rem;">${p.advice}</span>
+                </div>`;
+            });
+
+            document.getElementById('safetyMsg').innerHTML = html;
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user && !listenerAttached) {
+                listenerAttached = true;
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                if (!charts.hr) initCharts();
+
+                db.ref("smartwatch_data").on('value', (snapshot) => {
+                    const d = snapshot.val() || {};
+                    
+                    // Reset Watchdog Timer every time data is received
+                    clearTimeout(watchdogTimer);
+                    watchdogTimer = setTimeout(setDeviceOffline, 15000); // 15s delay
+
+                    const statusMsgEl = document.getElementById('statusMsg');
+                    
+                    // CHECK IF DEVICE IS WORN (Requires isWorn from ESP32)
+                    if (d.isWorn === true) {
+                        statusMsgEl.innerHTML = "✅ Live data: Device Worn";
+                        statusMsgEl.style.color = "#22c55e";
+                    } else if (d.isWorn === false) {
+                        statusMsgEl.innerHTML = "⚠️ Device ON: Not worn on wrist";
+                        statusMsgEl.style.color = "#eab308";
+                        // Reset values to 0 if not worn
+                        document.getElementById('hrVal').innerText = "0";
+                        document.getElementById('tempVal').innerText = "0";
+                        document.getElementById('spo2Val').innerText = "0";
+                        document.getElementById('bpVal').innerText = "0";
+                        return; // Skip graph updates if not worn
+                    } else {
+                        statusMsgEl.innerHTML = "✅ Live data updating...";
+                        statusMsgEl.style.color = "#22c55e";
+                    }
+
+                    document.getElementById('hrVal').innerText = safeNumber(d.heartRate).toFixed(0);
+                    document.getElementById('tempVal').innerText = safeNumber(d.temperature).toFixed(1);
+                    document.getElementById('spo2Val').innerText = safeNumber(d.spo2).toFixed(1);
+
+                    let bpDisplay = "0";
+                    if (d.systolic && d.diastolic) bpDisplay = `${d.systolic}/${d.diastolic}`;
+                    else if (d["blood pressure"]) bpDisplay = d["blood pressure"];
+                    if (d.map) bpDisplay += ` (${d.map})`;
+                    document.getElementById('bpVal').innerText = bpDisplay;
+
+                    const hrInfo = getStatusAndMsg("hr", safeNumber(d.heartRate));
+                    const tempInfo = getStatusAndMsg("temp", safeNumber(d.temperature));
+                    const spo2Info = getStatusAndMsg("spo2", safeNumber(d.spo2));
+                    const bpInfo = getStatusAndMsg("bp", safeNumber(d.map));
+
+                    document.getElementById('hrStatus').innerText = hrInfo.msg;
+                    document.getElementById('tempStatus').innerText = tempInfo.msg;
+                    document.getElementById('spo2Status').innerText = spo2Info.msg;
+                    document.getElementById('bpStatus').innerText = bpInfo.msg;
+
+                    document.getElementById('hrStatus').className = `status ${hrInfo.color}`;
+                    document.getElementById('tempStatus').className = `status ${tempInfo.color}`;
+                    document.getElementById('spo2Status').className = `status ${spo2Info.color}`;
+                    document.getElementById('bpStatus').className = `status ${bpInfo.color}`;
+
+                    updateSafetyRecommendation(d);
+                    updateSystemStatus(d); 
+
+                    const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                    labels.push(time);
+                    if (labels.length > 12) labels.shift();
+
+                    dataArrays.hr.push(safeNumber(d.heartRate));
+                    dataArrays.temp.push(safeNumber(d.temperature));
+                    dataArrays.spo2.push(safeNumber(d.spo2));
+                    dataArrays.bp.push(safeNumber(d.map));
+
+                    if (dataArrays.hr.length > 12) {
+                        Object.keys(dataArrays).forEach(k => dataArrays[k].shift());
+                    }
+
+                    Object.values(charts).forEach(chart => chart.update());
+                });
+            }
+        });
+    </script>
+</body>
+</html>
